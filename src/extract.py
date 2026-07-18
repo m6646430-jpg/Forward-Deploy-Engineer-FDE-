@@ -1,8 +1,8 @@
 """Stage 2 — Extract (the LLM agent).
 
-For each review, we ask Claude to return structured JSON matching ReviewInsight.
+For each review, we ask the Anthropic API to return structured JSON matching ReviewInsight.
 We force structure using a *tool definition* whose input_schema is our Pydantic
-schema. This is the single most reliable way to get structured output from Claude:
+schema. This is the single most reliable way to get structured output from the Anthropic API:
 the model must "call the tool" with args that match the schema, and the SDK/parse
 step rejects anything malformed.
 

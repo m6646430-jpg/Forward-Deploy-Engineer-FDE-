@@ -45,7 +45,7 @@ cp .env.example .env          # then paste your ANTHROPIC_API_KEY into .env
 
 # run the pipeline end to end on the sample data
 python -m src.ingest    data/sample_reviews.csv
-python -m src.extract               # calls Claude; costs a few cents on sample data
+python -m src.extract               # calls the Anthropic API; costs a few cents on sample data
 python -m src.aggregate
 python -m src.report                # writes docs/merch_digest.md
 
@@ -91,7 +91,7 @@ Tune `--products` × `--per-product` to control both cost and how much signal ea
 | `src/schema.py` | Pydantic models = the contract for what the LLM extracts. **Start reading here.** |
 | `src/ingest.py` | CSV → SQLite (the sample data). |
 | `src/ingest_amazon.py` | Stream + sample the real Amazon Reviews 2023 dataset. |
-| `src/extract.py` | The extraction agent (Claude structured output). |
+| `src/extract.py` | The extraction agent (Anthropic API, structured output). |
 | `src/aggregate.py` | Rollups + risk scoring. |
 | `src/report.py` | Weekly digest generator. |
 | `app/main.py` | FastAPI dashboard. |

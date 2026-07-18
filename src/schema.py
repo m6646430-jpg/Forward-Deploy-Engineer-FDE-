@@ -57,6 +57,6 @@ class ReviewInsight(BaseModel):
     )
 
 
-# The JSON Schema we hand to Claude's tool/structured-output. Generated from the model
+# The JSON Schema we hand to the Anthropic API tool/structured-output. Generated from the model
 # so it can never drift from the Pydantic definition above.
 REVIEW_INSIGHT_SCHEMA = ReviewInsight.model_json_schema()
