@@ -14,6 +14,9 @@ Key FDE lessons embedded here:
 Usage:  python -m src.extract
 """
 
+from __future__ import annotations
+
+import argparse
 import json
 import os
 from anthropic import Anthropic
@@ -62,16 +65,18 @@ def extract_one(review_text: str, product_name: str) -> ReviewInsight:
     return ReviewInsight.model_validate(tool_use.input)
 
 
-def run() -> int:
+def run(limit: int | None = None) -> int:
     init_schema()
     processed = 0
     with connect() as conn:
         # Only pull reviews we haven't extracted yet → idempotent + resumable.
+        # `limit` lets you smoke-test on 1-2 reviews before paying for the full run.
         rows = conn.execute(
             """SELECT r.review_id, r.product_name, r.review_text
                FROM reviews r
                LEFT JOIN insights i ON i.review_id = r.review_id
                WHERE i.review_id IS NULL"""
+            + (f" LIMIT {int(limit)}" if limit else "")
         ).fetchall()
 
         for row in rows:
@@ -99,5 +104,9 @@ def run() -> int:
 
 
 if __name__ == "__main__":
-    n = run()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--limit", type=int, default=None,
+                    help="only extract N reviews (use --limit 1 for a cheap smoke test)")
+    args = ap.parse_args()
+    n = run(limit=args.limit)
     print(f"\nExtracted insights for {n} new review(s).")
