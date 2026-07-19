@@ -51,7 +51,10 @@ def extract_one(review_text: str, product_name: str) -> ReviewInsight:
         model=MODEL,
         max_tokens=1024,
         tools=[EXTRACT_TOOL],
-        tool_choice={"type": "function", "function": {"name": "record_insight"}},
+        # "required" = must call a tool, but we don't pin which by name. Pinning a
+        # specific tool is rejected by some reasoning models (e.g. Kimi with thinking on);
+        # since we define exactly one tool, "required" forces record_insight anyway.
+        tool_choice="required",
         messages=[
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": f"Product: {product_name}\n\nReview:\n{review_text}"},

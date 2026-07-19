@@ -57,6 +57,34 @@ class ReviewInsight(BaseModel):
     )
 
 
-# The JSON Schema we hand to the Anthropic API tool/structured-output. Generated from the model
-# so it can never drift from the Pydantic definition above.
-REVIEW_INSIGHT_SCHEMA = ReviewInsight.model_json_schema()
+# A FLAT JSON Schema for the LLM tool call. We hand-write it (rather than use Pydantic's
+# auto-generated schema, which uses $defs/$ref) because some providers' function-calling —
+# notably Gemini — reject $ref. Enums are inlined. The response is still validated against
+# the Pydantic ReviewInsight above, so the two can't silently drift in a way that matters.
+_SENTIMENTS = [s.value for s in Sentiment]
+_CATEGORIES = [c.value for c in IssueCategory]
+
+REVIEW_INSIGHT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "sentiment": {"type": "string", "enum": _SENTIMENTS},
+        "issues": {
+            "type": "array", "items": {"type": "string"},
+            "description": "Specific problems mentioned, each a short phrase. Empty if none.",
+        },
+        "issue_categories": {
+            "type": "array", "items": {"type": "string", "enum": _CATEGORIES},
+            "description": "Which buckets the issues fall into.",
+        },
+        "praise": {
+            "type": "array", "items": {"type": "string"},
+            "description": "Specific things the customer liked. Empty if none.",
+        },
+        "summary": {"type": "string", "description": "One sentence capturing the key point."},
+        "evidence_quote": {
+            "type": "string",
+            "description": "A short verbatim quote (<=15 words) supporting the main issue, if any.",
+        },
+    },
+    "required": ["sentiment", "summary"],
+}

@@ -1,13 +1,16 @@
-"""LLM client — talks to OpenRouter's OpenAI-compatible API.
+"""LLM client — provider-agnostic, OpenAI-compatible chat completions over stdlib.
 
-OpenRouter (https://openrouter.ai) is a single API in front of many providers (Anthropic,
-Google, OpenAI, ...). We use it so the project runs on your OpenRouter credits and you can
-swap models by changing one string in .env — no code change.
+The project talks to any OpenAI-compatible endpoint, chosen entirely in .env:
 
-We call the REST endpoint directly with the stdlib (no extra dependency), the same
-lightweight approach used by the streaming ingester.
+  • Google Gemini (FREE tier):
+        LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+        LLM_API_KEY=<your Gemini key, starts with AIza...>
+  • OpenRouter (paid, many models):
+        LLM_BASE_URL=https://openrouter.ai/api/v1
+        LLM_API_KEY=<your key, starts with sk-or-v1-...>
 
-Requires OPENROUTER_API_KEY in .env (a key that starts with `sk-or-v1-...`).
+Swapping providers is a .env edit — no code change. We call the REST endpoint directly
+with the stdlib, the same lightweight approach used by the streaming ingester.
 """
 
 from __future__ import annotations
@@ -20,22 +23,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+BASE_URL = os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+
+_PLACEHOLDERS = {"", "sk-or-...", "sk-or-v1-...", "AIza...", "PASTE_YOUR_KEY_HERE"}
 
 
 def _api_key() -> str:
-    key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not key or key.startswith("sk-or-..."):
+    key = (os.getenv("LLM_API_KEY")
+           or os.getenv("OPENROUTER_API_KEY")
+           or os.getenv("GEMINI_API_KEY") or "").strip()
+    if key in _PLACEHOLDERS:
         raise SystemExit(
-            "OPENROUTER_API_KEY is not set. Paste your OpenRouter key (sk-or-v1-...) "
-            "into the .env file, then re-run."
+            "No LLM API key set. Put your key on the LLM_API_KEY line in .env "
+            "(Gemini key from your stock-digest project works, and it's free), then re-run."
         )
     return key
 
 
 def chat(messages: list[dict], model: str, tools=None, tool_choice=None,
          max_tokens: int = 1024) -> dict:
-    """POST a chat completion to OpenRouter and return the parsed JSON response."""
+    """POST a chat completion and return the parsed JSON response."""
     body: dict = {"model": model, "messages": messages, "max_tokens": max_tokens}
     if tools:
         body["tools"] = tools
@@ -43,12 +50,12 @@ def chat(messages: list[dict], model: str, tools=None, tool_choice=None,
         body["tool_choice"] = tool_choice
 
     req = urllib.request.Request(
-        OPENROUTER_URL,
+        f"{BASE_URL}/chat/completions",
         data=json.dumps(body).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {_api_key()}",
             "Content-Type": "application/json",
-            # Optional but recommended by OpenRouter for attribution:
+            # OpenRouter uses these for attribution; other providers ignore them.
             "HTTP-Referer": "https://github.com/m6646430-jpg/Forward-Deploy-Engineer-FDE-",
             "X-Title": "Review Intelligence",
         },
@@ -59,11 +66,13 @@ def chat(messages: list[dict], model: str, tools=None, tool_choice=None,
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "ignore")
-        if e.code == 401:
-            raise SystemExit("OpenRouter rejected the key (401). Check OPENROUTER_API_KEY in .env.")
+        if e.code in (401, 403):
+            raise SystemExit(f"LLM provider rejected the key ({e.code}). Check LLM_API_KEY in .env.")
         if e.code == 402:
-            raise SystemExit("OpenRouter says insufficient credits (402). Top up at openrouter.ai.")
-        raise SystemExit(f"OpenRouter error {e.code}: {detail[:400]}")
+            raise SystemExit("Insufficient credits (402). Use the free Gemini tier or top up.")
+        if e.code == 429:
+            raise SystemExit("Rate limited (429). Free tiers are slow — wait a bit or lower volume.")
+        raise SystemExit(f"LLM error {e.code}: {detail[:400]}")
 
 
 def text_of(response: dict) -> str:
