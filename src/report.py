@@ -55,13 +55,20 @@ def run() -> str:
     products = compute()
     resp = chat(
         model=MODEL,
-        max_tokens=2000,
+        # Generous budget: reasoning-capable models spend tokens thinking before the
+        # actual prose, so a small limit gets truncated to empty content.
+        max_tokens=6000,
         messages=[
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": build_prompt(products)},
         ],
     )
-    body = text_of(resp)
+    body = text_of(resp).strip()
+    if not body:
+        raise SystemExit(
+            "Report model returned empty content (likely truncated by reasoning tokens). "
+            "Raise max_tokens or use a non-reasoning REPORT_MODEL."
+        )
     report = f"# NovaGoods — Weekly Merch Intelligence\n_{date.today().isoformat()}_\n\n{body}\n"
     OUT.write_text(report, encoding="utf-8")
     return str(OUT)

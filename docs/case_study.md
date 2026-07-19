@@ -60,9 +60,12 @@ Amazon Reviews (JSONL, 300MB–9GB)
    enough. For the Appliances demo it scanned 120,000 reviews — a small fraction of the
    929 MB file — in ~10 seconds, then cached the sample so re-runs are instant.
 
-2. **Right model for each job.** A cheap, fast model does the high-volume per-review
-   extraction; a stronger model does the low-volume weekly synthesis. This keeps cost at
-   ~$1–2 for 600 reviews while keeping the final report sharp.
+2. **Provider-agnostic by design.** All LLM calls go through one OpenAI-compatible client
+   (`src/llm.py`), so the model is a one-line `.env` change. That mattered in practice: I
+   started on a reasoning model for the report, found it was too slow and burned its token
+   budget on hidden reasoning (empty output), and swapped to a faster model in one edit —
+   no code change. Structured extraction is forced via a tool schema and validated with
+   Pydantic, with per-review retries for the occasional malformed response.
 
 3. **A risk score the customer can trust.** Scoring is deliberately *not* an LLM black box
    — it's transparent Python: negative share + defect share + a bonus when one issue
@@ -71,57 +74,71 @@ Amazon Reviews (JSONL, 300MB–9GB)
 
 ## 4. Results
 
-Run on 598 real Appliances reviews across 15 products.
+Run end-to-end on **598 real Appliances reviews across 15 products** (585 successfully
+structured, 98%). Extraction: Kimi K2.5 via OpenRouter; synthesis: same.
 
-### Headline finding — a product-fit problem hiding under a decent star rating
+### Headline finding — a "defeats the purpose" product hiding under an average rating
 
-The pipeline surfaced the **"Keurig My K-Cup Reusable Coffee Filter (Old Model)"** as the
-highest-risk product. Its 3.8-star average looks unremarkable — but the *content* of the
-complaints is a tight cluster:
+The pipeline ranked the **"Keurig My K-Cup Reusable Coffee Filter (Old Model)"** as the
+highest-risk product: **risk 0.37, 31% negative sentiment**, with a recurring **usability**
+cluster (4+ reviews). The complaints aren't scattered — they converge on the product
+failing at its core job:
 
-- **9 of 40 reviews are negative (≤ 2★).**
-- **4 of those 9 independently complain that the coffee comes out weak/watery** —
-  "very weak coffee," "colored water… too weak," "brown water," "weak coffee."
+- Leaking: *"leaking water flows over basket rim,"* *"missing compliant gasket/seal,"*
+  *"rubber gasket slides up post."*
+- Effort/usability: *"extensive prep and cleaning required,"* *"tricky screw-on assembly."*
+- Weak output: *"inconsistent coffee strength,"* *"when I brewed first cup it was brown water."*
 
-That's not scattered noise; it's the same complaint, from unrelated customers, about a
-core function of the product. A star average buries it. Structured extraction makes it the
-top line of the Monday digest.
+One review sums up the risk to the brand in a sentence:
+> "Using a My K-cup filter assembly with your own coffee really defeats the purpose of having a Keurig."
 
-**Recommended action (what I'd tell the customer):** this is a *listing-expectation* problem
-as much as a product one. Either update the product description and imagery to set brew-
-strength expectations, or reconsider stocking the "Old Model" given a newer version exists.
-Cheapest fix first; measure return-rate change.
+A star average buries this. Structured extraction makes it the top line of the Monday digest.
 
-### Risk ranking (raw signal)
+**Recommended action:** audit the gasket supplier's tolerances and mold specs; if the
+current revision already fixes the seal, delist the legacy SKU. Measure return-rate change.
 
-Products with the highest negative share in the sample:
+### Risk ranking (LLM-labeled, explainable)
 
-| Product | Negative / total | Dominant theme |
-|---|---|---|
-| Keurig My K-Cup Reusable Filter (Old Model) | 9 / 40 | weak/watery coffee |
-| Disposable Paper Coffee Filters (Keurig-compatible) | 6 / 40 | ⟩ FILL after extract |
-| Reusable Coffee Pods (4-pack) | 5 / 39 | ⟩ FILL after extract |
-| iPartPlusMore Reusable Coffee Filters | 4 / 40 | ⟩ FILL after extract |
+| Product | Risk | Negative | Dominant cluster |
+|---|---|---|---|
+| Keurig My K-Cup Reusable Filter (Old Model) | **0.37** | 31% | usability — seal failure, leaks |
+| Reusable Coffee Pods (4-pack) | 0.34 | 23% | usability — brew spray, fit |
+| Disposable Paper Coffee Filters (Keurig) | 0.33 | 25% | usability — wet-handling, 2.0 incompatibility |
+| Linda's Silicone Stove Gap Covers | 0.32 | 23% | sizing_fit — doesn't stay put, safety |
 
-*⟩ FILL: after running `extract` + `aggregate`, paste the categorized `risk_score` column
-and dominant issue category per product here — that's the LLM turning raw negatives into
-labeled, explainable risk.*
+The risk score is transparent Python (negative share + defect share + a bonus when one
+category recurs ≥ 3×), so every flag is explainable — no black box.
+
+### The engineering story worth telling (this is the real FDE moment)
+
+The first full run on real data produced **flat risk scores and empty issue clusters** —
+the model was capturing sentiment correctly but leaving the structured `issues`/`categories`
+empty, because the original prompt ("do not invent problems") made it too conservative.
+I diagnosed it by inspecting one product's raw extractions, tested a hardened prompt on a
+2-review sample until issues + categories populated reliably, then **re-extracted only the
+135 reviews that mattered** (non-positive) rather than redoing all 598. The risk model then
+surfaced the real patterns above.
+
+*It worked on the synthetic demo data but behaved differently on the customer's real,
+messy data — so I diagnosed, fixed, and re-ran.* That loop is the job.
 
 ### The deliverable
 
-⟩ FILL: paste a 4–6 line excerpt of the generated `docs/merch_digest.md` here, and drop a
-screenshot of the dashboard (`app/main.py`) at `docs/dashboard.png`.
+Excerpt of the auto-generated weekly digest (`docs/merch_digest.md`):
 
-```
-![Dashboard](dashboard.png)
-```
+> **Keurig My K-Cup Reusable Coffee Filter - Old Model**
+> **Pattern:** Seal failure and dimensional tolerance gaps causing leakage and grind contamination.
+> **Evidence:** 39 reviews, 31% negative, risk 0.37; "leaking water flows over basket rim," "missing compliant gasket/seal," "rubber gasket slides up post."
+> **Action:** Audit gasket supplier tolerances and injection mold specs; delist legacy model if current revision resolves failures.
+
+_Dashboard screenshot: run `uvicorn app.main:app --reload`, then save it to `docs/dashboard.png`._
 
 ### By the numbers
 
-- 598 reviews across 15 products processed end-to-end.
-- ~10 s to sample from a 929 MB source file (streamed, not downloaded).
-- ~$1–2 total LLM cost for the full extraction pass.
-- Weekly digest generated in under a minute.
+- 598 reviews / 15 products processed; 585 structured (98% after retries).
+- Sampled from a **929 MB** source file in ~10 s (streamed, never downloaded).
+- Total LLM cost: a few dollars (Kimi K2.5 via OpenRouter).
+- Weekly digest generated in one call.
 
 ## 5. What I'd do next
 
