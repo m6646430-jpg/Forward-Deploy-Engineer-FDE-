@@ -41,11 +41,11 @@ reviews.csv → [ingest] → SQLite → [extract agent] → insights
 cd retail-review-intelligence
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # then paste your ANTHROPIC_API_KEY into .env
+cp .env.example .env          # then paste your OpenRouter API key into .env
 
 # run the pipeline end to end on the sample data
 python -m src.ingest    data/sample_reviews.csv
-python -m src.extract               # calls the Anthropic API; costs a few cents on sample data
+python -m src.extract               # calls an LLM via OpenRouter; costs a few cents on sample data
 python -m src.aggregate
 python -m src.report                # writes docs/merch_digest.md
 
@@ -91,7 +91,8 @@ Tune `--products` × `--per-product` to control both cost and how much signal ea
 | `src/schema.py` | Pydantic models = the contract for what the LLM extracts. **Start reading here.** |
 | `src/ingest.py` | CSV → SQLite (the sample data). |
 | `src/ingest_amazon.py` | Stream + sample the real Amazon Reviews 2023 dataset. |
-| `src/extract.py` | The extraction agent (Anthropic API, structured output). |
+| `src/extract.py` | The extraction agent (LLM via OpenRouter, structured output). |
+| `src/llm.py` | Tiny OpenRouter client (stdlib, no extra deps). |
 | `src/aggregate.py` | Rollups + risk scoring. |
 | `src/report.py` | Weekly digest generator. |
 | `app/main.py` | FastAPI dashboard. |

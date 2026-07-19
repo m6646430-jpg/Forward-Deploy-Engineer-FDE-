@@ -15,14 +15,12 @@ Usage:  python -m src.report
 import os
 from datetime import date
 from pathlib import Path
-from anthropic import Anthropic
-from dotenv import load_dotenv
 
 from src.aggregate import compute
+from src.llm import chat, text_of
 
-load_dotenv()
-client = Anthropic()
-MODEL = os.getenv("REPORT_MODEL", "claude-sonnet-5")
+# A stronger model for the low-volume synthesis. Any OpenRouter model id works.
+MODEL = os.getenv("REPORT_MODEL", "anthropic/claude-sonnet-4.5")
 OUT = Path(__file__).resolve().parent.parent / "docs" / "merch_digest.md"
 
 SYSTEM = (
@@ -55,13 +53,15 @@ def build_prompt(products: list[dict]) -> str:
 
 def run() -> str:
     products = compute()
-    msg = client.messages.create(
+    resp = chat(
         model=MODEL,
         max_tokens=2000,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": build_prompt(products)}],
+        messages=[
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": build_prompt(products)},
+        ],
     )
-    body = "".join(b.text for b in msg.content if b.type == "text")
+    body = text_of(resp)
     report = f"# NovaGoods — Weekly Merch Intelligence\n_{date.today().isoformat()}_\n\n{body}\n"
     OUT.write_text(report, encoding="utf-8")
     return str(OUT)

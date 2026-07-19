@@ -19,16 +19,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from anthropic import Anthropic
-from dotenv import load_dotenv
 
 from src.db import connect, init_schema
+from src.llm import chat, tool_args_of
 from src.schema import ReviewInsight, REVIEW_INSIGHT_SCHEMA
 
-load_dotenv()
-
-client = Anthropic()  # reads ANTHROPIC_API_KEY from env
-MODEL = os.getenv("EXTRACT_MODEL", "claude-haiku-4-5-20251001")
+# Any model on OpenRouter. Default is a cheap, fast model — perfect for per-review work.
+MODEL = os.getenv("EXTRACT_MODEL", "anthropic/claude-haiku-4.5")
 
 SYSTEM = (
     "You are a retail merchandising analyst. You read one customer product review "
@@ -37,32 +34,31 @@ SYSTEM = (
     "short and specific (e.g. 'zipper split after 2 weeks', not 'bad quality')."
 )
 
-# The tool is just a schema-carrier. We never execute anything; we force the model
-# to produce args matching our schema.
+# The tool is just a schema-carrier (OpenAI function-calling format). We never execute
+# anything; we force the model to produce args matching our schema.
 EXTRACT_TOOL = {
-    "name": "record_insight",
-    "description": "Record the structured insight extracted from one review.",
-    "input_schema": REVIEW_INSIGHT_SCHEMA,
+    "type": "function",
+    "function": {
+        "name": "record_insight",
+        "description": "Record the structured insight extracted from one review.",
+        "parameters": REVIEW_INSIGHT_SCHEMA,
+    },
 }
 
 
 def extract_one(review_text: str, product_name: str) -> ReviewInsight:
-    msg = client.messages.create(
+    resp = chat(
         model=MODEL,
         max_tokens=1024,
-        system=SYSTEM,
         tools=[EXTRACT_TOOL],
-        tool_choice={"type": "tool", "name": "record_insight"},
+        tool_choice={"type": "function", "function": {"name": "record_insight"}},
         messages=[
-            {
-                "role": "user",
-                "content": f"Product: {product_name}\n\nReview:\n{review_text}",
-            }
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": f"Product: {product_name}\n\nReview:\n{review_text}"},
         ],
     )
-    # With forced tool_choice, the first tool_use block holds our structured args.
-    tool_use = next(b for b in msg.content if b.type == "tool_use")
-    return ReviewInsight.model_validate(tool_use.input)
+    # With forced tool_choice, the first tool call holds our structured args.
+    return ReviewInsight.model_validate(tool_args_of(resp))
 
 
 def run(limit: int | None = None) -> int:

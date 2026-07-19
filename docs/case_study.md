@@ -1,7 +1,7 @@
 # Case Study — Review Intelligence for a Retailer
 
 **Role:** Forward Deployed Engineer (simulated engagement)
-**Stack:** Python · Anthropic API (structured output) · SQLite · FastAPI
+**Stack:** Python · OpenRouter (LLM API, structured output) · SQLite · FastAPI
 **Data:** Amazon Reviews 2023 (UC San Diego / McAuley Lab), *Appliances* category
 **Repo:** https://github.com/m6646430-jpg/Forward-Deploy-Engineer-FDE-
 
@@ -44,7 +44,7 @@ Amazon Reviews (JSONL, 300MB–9GB)
    [ingest]  →  SQLite
         │
         ▼
-   [extract]  →  one Anthropic API call per review → validated structured JSON
+   [extract]  →  one LLM call per review → validated structured JSON
         │        (defects, sizing/fit, quality, praise, sentiment, evidence quote)
         ▼
    [aggregate]  →  per-product rollups + a transparent risk score  (plain Python, no LLM)
