@@ -29,10 +29,12 @@ from src.schema import ReviewInsight, REVIEW_INSIGHT_SCHEMA
 MODEL = os.getenv("EXTRACT_MODEL", "anthropic/claude-haiku-4.5")
 
 SYSTEM = (
-    "You are a retail merchandising analyst. You read one customer product review "
-    "and extract structured signal for the merch team. Be precise and literal: only "
-    "record issues the review actually states. Do not invent problems. Keep phrases "
-    "short and specific (e.g. 'zipper split after 2 weeks', not 'bad quality')."
+    "You are a retail merchandising analyst. Extract structured signal from ONE customer "
+    "review for the merch team. RULES: (1) If the customer expresses ANY dissatisfaction "
+    "or problem, you MUST list each specific complaint in 'issues' as a short phrase "
+    "(e.g. 'zipper split after 2 weeks', not 'bad quality'). (2) For EVERY issue, add at "
+    "least one matching value to 'issue_categories'. (3) Use only what the review states; "
+    "never invent. An empty 'issues' list is allowed ONLY for a purely positive review."
 )
 
 # The tool is just a schema-carrier (OpenAI function-calling format). We never execute
