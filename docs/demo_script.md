@@ -54,18 +54,22 @@ python3 -m src.extract
 
 **[ON SCREEN]** Switch to the dashboard. Point at the top row.
 
-> "Here's the payoff. The dashboard sorts products by risk. Top of the list: the Keurig
-> reusable coffee filter. Its star average is 3.8 — totally unremarkable, you'd walk right
-> past it. But watch what happens when I click in."
+> "Here's the payoff. The dashboard sorts products by risk. Top of the list, at 0.37: the
+> Keurig reusable coffee filter. Its star average is under 4 — totally unremarkable, you'd
+> walk right past it. But watch what happens when I click in."
 
 **[ON SCREEN]** Click the Keurig product → drill-in page. Point at the issues + quotes.
 
-> "Nine of its forty reviews are negative — and they're not complaining about random
-> things. Four of them, independently, say the same thing: the coffee comes out weak and
-> watery. 'Brown water.' 'Colored water, too weak.' That's not noise — that's one specific
-> failure, from unrelated customers, about the product's whole job."
+> "Thirty-one percent of its reviews are negative, and they're not random — they cluster on
+> one theme the model labeled 'usability.' The filter leaks: 'water flows over the basket
+> rim,' 'missing gasket seal,' 'rubber gasket slides up the post.' It's a pain to use, and
+> the coffee comes out weak. One customer nails the business risk in a sentence:"
 
-> "A star average completely buries this. Structured extraction makes it the headline."
+**[ON SCREEN]** Point at the evidence quote.
+
+> "'Using a My K-cup filter with your own coffee really defeats the purpose of having a
+> Keurig.' That's a brand problem hiding under an average star rating — and structured
+> extraction pulls it straight to the top of the list."
 
 ## [2:15–2:40] · The deliverable + the recommendation
 
@@ -73,9 +77,9 @@ python3 -m src.extract
 
 > "And this all lands as a weekly digest — the thing the merch team opens on Monday.
 > Flagged products, the pattern, the evidence, and a recommended action. For the Keurig
-> filter: this is a listing-expectations problem as much as a product one. Update the
-> description to set brew-strength expectations, or reconsider stocking the old model —
-> and measure the return rate."
+> filter the recommendation writes itself: audit the gasket supplier's tolerances, and if
+> the current revision already fixes the seal, delist the old model — then measure the
+> return rate."
 
 ## [2:40–3:00] · Close — thinking like an FDE
 
