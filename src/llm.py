@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from dotenv import load_dotenv
@@ -61,18 +62,28 @@ def chat(messages: list[dict], model: str, tools=None, tool_choice=None,
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "ignore")
-        if e.code in (401, 403):
-            raise SystemExit(f"LLM provider rejected the key ({e.code}). Check LLM_API_KEY in .env.")
-        if e.code == 402:
-            raise SystemExit("Insufficient credits (402). Use the free Gemini tier or top up.")
-        if e.code == 429:
-            raise SystemExit("Rate limited (429). Free tiers are slow — wait a bit or lower volume.")
-        raise SystemExit(f"LLM error {e.code}: {detail[:400]}")
+    # Retry transient failures (rate limits, 5xx, network blips) with backoff.
+    # Fail fast on auth/credit/bad-request errors — retrying those is pointless.
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "ignore")
+            if e.code in (401, 403):
+                raise SystemExit(f"LLM provider rejected the key ({e.code}). Check LLM_API_KEY in .env.")
+            if e.code == 402:
+                raise SystemExit("Insufficient credits (402). Top up your OpenRouter account.")
+            if e.code in (429, 500, 502, 503, 529) and attempt < 4:
+                time.sleep(2 ** attempt)  # 1, 2, 4, 8s
+                continue
+            raise SystemExit(f"LLM error {e.code}: {detail[:400]}")
+        except urllib.error.URLError:
+            if attempt < 4:
+                time.sleep(2 ** attempt)
+                continue
+            raise
+    raise SystemExit("LLM request failed after retries.")
 
 
 def text_of(response: dict) -> str:
